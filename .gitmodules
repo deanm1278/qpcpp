@@ -1,0 +1,3 @@
+[submodule "3rd_party/bfin-CMSIS"]
+	path = 3rd_party/bfin-CMSIS
+	url = https://github.com/deanm1278/bfin-CMSIS
