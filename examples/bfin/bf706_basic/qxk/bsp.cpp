@@ -49,6 +49,8 @@ void operator delete(void *p, unsigned long) throw() {
     free(p);
 }
 
+extern "C" void __libc_init_array(void);
+
 //Q_DEFINE_THIS_FILE
 
 #define ENABLE_BSP_PRINT
@@ -56,6 +58,7 @@ void operator delete(void *p, unsigned long) throw() {
 volatile uint32_t _systemMs = 0;
 
 void BspInit() {
+
       //SEC_Global->SEC0_GCTL.bit.RESET = 1;
     //SCI->SEC0_CCTL0.bit.RESET = 1;
 
@@ -69,6 +72,19 @@ void BspInit() {
     //enable interrupts
     SEC_Global->SEC0_GCTL.bit.EN = 1;
     SCI->SEC0_CCTL0.bit.EN = 1;
+
+    //set clocks
+    CGU0->PLLCTL.bit.PLLBPCL = 1;
+    while( (CGU0->STAT.reg & 0xF) != 0x05 ); //wait
+    CGU0->DIV.reg = 0x03042442;
+    CGU0->CTL.reg = 0x00002000;
+
+    while(CGU0->STAT.bit.PLLBP || CGU0->STAT.bit.CLKSALGN || (!CGU0->STAT.bit.PLOCK))
+    {
+    	//wait for alignment and lock
+    }
+
+	//__libc_init_array();
 }
 
 void BspWrite(char const *buf, uint32_t len) {

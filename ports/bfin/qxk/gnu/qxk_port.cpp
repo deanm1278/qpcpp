@@ -66,7 +66,7 @@ void Thread_ret(void);
 void QXK_init(void) {
     //set REG_ICU_EVT14 to call PendSV_Handler
     __asm volatile( 
-    "  P0 = 0x1FC02108 ;        \n"
+    "  P0 = 0x1FC02038 ;        \n" // P0 = ICU_EVT14
     "  R0.H = _PendSV_Handler ; \n"
     "  R0.L = _PendSV_Handler ; \n"
     "  [P0] = R0 ;              \n"
@@ -176,7 +176,7 @@ volatile unsigned int __imask;
 //__attribute__ ((naked, optimize("-fno-stack-protector")))
 void PendSV_Handler(void) {
 __asm volatile (
-    ""
+    "EMUEXCPT; " //TODO: ok now we need to do context switch
 #if 0
     /* Prepare some constants before entering a critical section... */
     "  LDR     r3,=QXK_attr_    \n"

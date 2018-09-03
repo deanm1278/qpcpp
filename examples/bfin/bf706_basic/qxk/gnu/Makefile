@@ -100,7 +100,8 @@ CPP_SRCS :=	\
 	fw_evt.cpp \
 	bsp.cpp \
 	main.cpp \
-	System.cpp
+	System.cpp \
+	AOLED.cpp
 
 OUTPUT    := $(PROJECT)
 LD_SCRIPT := $(PROJECT).ld

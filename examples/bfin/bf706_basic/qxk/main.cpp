@@ -11,6 +11,7 @@
 #include "fw_macro.h"
 
 #include "System.h"
+#include "AOLED.h"
 
 using namespace QP;
 
@@ -28,6 +29,7 @@ uint32_t evtPoolLarge[ROUND_UP_DIV_4(EVT_SIZE_LARGE * EVT_COUNT_LARGE)];
 QP::QSubscrList subscrSto[MAX_PUB_SIG];
 
 static System sys;
+static AOLED led;
 
 int main(void)
 {
@@ -41,6 +43,7 @@ int main(void)
 
 	//Start active objects.
 	sys.Start(PRIO_SYSTEM);
+	led.Start(PRIO_LED);
 
 	//publish a start request
 	Evt *evt = new SystemStartReq(0);

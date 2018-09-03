@@ -27,21 +27,49 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
 
-#ifndef HSM_ID_H
-#define HSM_ID_H
 
-enum {
-    SYSTEM = 1,
-	ID_LED,
+#ifndef AOLED_H
+#define AOLED_H
+
+#include "qpcpp.h"
+
+#include "hsm_id.h"
+#include "fw_evt.h"
+#include "fw_macro.h"
+
+using namespace QP;
+using namespace FW;
+
+#define PORT_LED PORTC
+
+#define PIN_LED 3
+#define PIN_LED_MASK (1UL << PIN_LED)
+
+class AOLED : public QActive {
+public:
+    AOLED();
+    void Start(uint8_t prio) {
+        QActive::start(prio, m_evtQueueStor, ARRAY_COUNT(m_evtQueueStor), NULL, 0);
+    }
+
+protected:
+    static QState InitialPseudoState(AOLED * const me, QEvt const * const e);
+    static QState Root(AOLED * const me, QEvt const * const e);
+    static QState Stopped(AOLED * const me, QEvt const * const e);
+    static QState Started(AOLED * const me, QEvt const * const e);
+
+    enum {
+        EVT_QUEUE_COUNT = 16,
+    };
+    QEvt const *m_evtQueueStor[EVT_QUEUE_COUNT];
+    uint8_t m_id;
+    char const * m_name;
+
+    QTimeEvt m_blinkTimer;
+    uint8_t m_LEDState;
+
 };
 
-// Higher value corresponds to higher priority.
-// The maximum priority is defined in qf_port.h as QF_MAX_ACTIVE (32)
-enum
-{
-  PRIO_SYSTEM     = 10,
-  PRIO_LED = 20,
-};
 
+#endif // AOLED_H
 
-#endif // HSM_ID_H

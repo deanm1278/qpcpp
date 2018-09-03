@@ -53,6 +53,12 @@ enum {
     SYSTEM_DONE,
     SYSTEM_FAIL,
 	
+	LED_START_REQ,
+	LED_START_CFM,
+	LED_STOP_REQ,
+	LED_STOP_CFM,
+	LED_BLINK,
+
     MAX_PUB_SIG
 };
 
@@ -94,4 +100,18 @@ public:
         ErrorEvt(SYSTEM_FAIL, 0, error, reason) {}
 };
 
+
+//LED
+
+class LEDStartCfm : public ErrorEvt {
+public:
+    LEDStartCfm(uint16_t seq, Error error, Reason reason = 0) :
+        ErrorEvt(LED_START_CFM, seq, error, reason) {}
+};
+
+class LEDStopCfm : public ErrorEvt {
+public:
+    LEDStopCfm(uint16_t seq, Error error, Reason reason = 0) :
+        ErrorEvt(LED_STOP_CFM, seq, error, reason) {}
+};
 #endif
