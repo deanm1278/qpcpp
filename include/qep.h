@@ -187,6 +187,7 @@ extern char_t const versionStr[6];
         friend class QMActive;
         friend class QTimeEvt;
         friend class QEQueue;
+        friend class QXThread;
         friend class QTicker;
         friend uint8_t QF_EVT_POOL_ID_ (QEvt const * const e);
         friend uint8_t QF_EVT_REF_CTR_ (QEvt const * const e);
