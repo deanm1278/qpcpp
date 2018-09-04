@@ -125,7 +125,8 @@ QP_SRCS := \
 	qxk_xthr.cpp \
 	qxk_port.cpp
 
-QP_ASMS :=
+QP_ASMS := \
+	qxk_port_asm.S
 
 QS_SRCS := \
 	qs.cpp \
