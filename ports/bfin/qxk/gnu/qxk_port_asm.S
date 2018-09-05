@@ -24,10 +24,6 @@
 /*Q_ASSERT_COMPILE(QMACTIVE_OSOBJ == offsetof(QActive, osObject));*/
 /*Q_ASSERT_COMPILE(QMACTIVE_PRIO == offsetof(QActive, prio));*/
 
-/* helper macros to "stringify" values */
-#define VAL(x) #x
-#define STRINGIFY(x) VAL(x)
-
 /*****************************************************************************
 * The PendSV_Handler exception handler is used for handling context switch
 * and asynchronous preemption in QXK. The use of the PendSV exception is
@@ -56,7 +52,102 @@
 .global _PendSV_Handler;
 .type _PendSV_Handler, STT_FUNC;
 
+.extern _QXK_attr_;
+.type _QXK_attr_,STT_OBJECT;
+
 _PendSV_Handler:
+	[--SP] = R7;
+	[--SP] = R6;
+	[--SP] = P2;
+	[--SP] = P5;
+	[--SP] = P4;
+	[--SP] = P3;
+	[--SP] = ASTAT;
+
+	P5.H = _QXK_attr_;
+	P5.L = _QXK_attr_;
+
+	//TODO: disable interrupts here if we enable nesting
+
+	P4 = [P5+QXK_NEXT]; 			/*P4 = QXK_attr_.next */
+
+	/* Check QXK_attr_.next, which contains the pointer to the next thread
+    * to run, which is set in QXK_ISR_EXIT(). This pointer must not be NULL.
+    */
+	CC = P4 == 0;					/* is (QXK_attr_.next == 0)? */
+    IF CC JUMP PendSV_return;		/* branch if (QXK_attr_.next == 0) */
+
+    /* Load pointers into registers... */
+    R7 = [P4+QMACTIVE_OSOBJ];		/* r7 := QXK_attr_.next->osObject */
+    P2 = [P5+QXK_CURR]				/* P2 := QXK_attr_.curr */
+
+    CC = P2 == 0;					/* (QXK_attr_.curr == 0)? */
+	IF !CC JUMP PendSV_save_ex;      /* branch if (current thread is extended) */
+
+    CC = R7 == 0;            		/* (QXK_attr_.next->osObject == 0)? */
+    IF !CC JUMP PendSV_save_ao    	/* branch if (next tread is extended) */
+
+PendSV_activate:
+	//TODO: leaving off here
+
+	/* The QXK activator must be called in a thread context, while this code
+    * executes in the handler contex of the PendSV exception. The switch
+    * to the Thread mode is accomplished by returning from PendSV using
+    * a fabricated exception stack frame, where the return address is
+    * QXK_activate_().
+    *
+    * NOTE: the QXK activator is called with interrupts DISABLED and also
+    * it returns with interrupts DISABLED.
+    */
+      MOV     r3,#1
+      LSL     r3,r3,#24         /* r3 := (1 << 24), set the T bit  (new xpsr) */
+      LDR     r2,=QXK_activate_ /* address of QXK_activate_ */
+      SUB     r2,r2,#1          /* align Thumb-address at halfword (new pc) */
+      LDR     r1,=Thread_ret    /* return address after the call   (new lr) */
+
+      SUB     sp,sp,#(8*4)      /* reserve space for exception stack frame */
+      ADD     r0,sp,#(5*4)      /* r0 := 5 registers below the top of stack */
+      STM     r0!,{r1-r3}       /* save xpsr,pc,lr */
+
+      MOV     r0,#6
+      MVN     r0,r0             /* r0 := ~6 == 0xFFFFFFF9 */
+      BX      r0                /* exception-return to the QXK activator */
+
+	 /*=========================================================================
+    * Saving AO-thread before crossing to eXtended-thread
+    * expected register contents:
+    * P4  -> QXK_attr_.next
+    * P2  -> QXK_attr_.curr
+    * r7  -> QXK_attr_.next->osObject (SP)
+    * P5  -> &QXK_attr_
+    */
+PendSV_save_ao:
+
+	/* otherwise continue to restoring next AO-thread... */
+
+	/*-------------------------------------------------------------------------
+	* Restoring AO-thread after crossing from eXtended-thread
+	* expected register contents:
+	* r1  -> QXK_attr_.curr
+	* r2  -> QXK_attr_.next->osObject (SP)
+	* r3  -> &QXK_attr_
+	* r12 -> QXK_attr_.next
+	*/
+PendSV_restore_ao:
+
+PendSV_return:
+	ASTAT = [SP++];
+	P3 = [SP++];
+	P4 = [SP++];
+	P5 = [SP++];
+	P2 = [SP++];
+	R7 = [SP++];
+
+PendSV_save_ex:
+
+PendSV_restore_ex:
+
+#if 0
     /* Prepare some constants before entering a critical section... */
       LDR     r3,=QXK_attr_    
       LDR     r2,= STRINGIFY(NVIC_ICSR)  /* Interrupt Control and State */
@@ -284,3 +375,4 @@ _PendSV_Handler:
       MSR     PSP,r2            /* Process Stack Pointer := r2 */
 
       BX      lr                /* return to the next extended-thread */
+  #endif
