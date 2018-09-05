@@ -24,6 +24,174 @@
 /*Q_ASSERT_COMPILE(QMACTIVE_OSOBJ == offsetof(QActive, osObject));*/
 /*Q_ASSERT_COMPILE(QMACTIVE_PRIO == offsetof(QActive, prio));*/
 
+#define SAVE_CONTEXT \
+	[--sp] = ( R7:1, P5:2 ); \
+	R1 = RETI; \
+	RETI = R1; \
+	[--sp] = R1; \
+	[--sp] = fp; \
+\
+	[--sp] = i0; \
+	[--sp] = i1; \
+	[--sp] = i2; \
+	[--sp] = i3; \
+\
+	[--sp] = m0; \
+	[--sp] = m1; \
+	[--sp] = m2; \
+	[--sp] = m3; \
+\
+	[--sp] = l0; \
+	[--sp] = l1; \
+	[--sp] = l2; \
+	[--sp] = l3; \
+\
+	[--sp] = b0; \
+	[--sp] = b1; \
+	[--sp] = b2; \
+	[--sp] = b3; \
+	[--sp] = a0.x; \
+	[--sp] = a0.w; \
+	[--sp] = a1.x; \
+	[--sp] = a1.w; \
+\
+	[--sp] = LC0; \
+	[--sp] = LC1; \
+	[--sp] = LT0; \
+	[--sp] = LT1; \
+	[--sp] = LB0; \
+	[--sp] = LB1; \
+\
+	[--sp] = RETS; \
+	[--sp] = SEQSTAT; \
+	[--sp] = SYSCFG
+
+#define RESTORE_CONTEXT \
+	SYSCFG = [sp++]; \
+	SEQSTAT = [sp++]; \
+	RETS = [sp++]; \
+\
+	LB1 = [sp++]; \
+	LB0 = [sp++]; \
+	LT1 = [sp++]; \
+	LT0 = [sp++]; \
+	LC1 = [sp++]; \
+	LC0 = [sp++]; \
+\
+	a1.w = [sp++]; \
+	a1.x = [sp++]; \
+	a0.w = [sp++]; \
+	a0.x = [sp++]; \
+	b3 = [sp++]; \
+	b2 = [sp++]; \
+	b1 = [sp++]; \
+	b0 = [sp++]; \
+\
+	l3 = [sp++]; \
+	l2 = [sp++]; \
+	l1 = [sp++]; \
+	l0 = [sp++]; \
+\
+	m3 = [sp++]; \
+	m2 = [sp++]; \
+	m1 = [sp++]; \
+	m0 = [sp++]; \
+\
+	i3 = [sp++]; \
+	i2 = [sp++]; \
+	i1 = [sp++]; \
+	i0 = [sp++]; \
+\
+	fp = [sp++]; \
+	R0 = [sp++]; \
+	RETI = R0; \
+\
+	( R7 : 1, P5 : 2) = [ SP ++ ]; \
+	ASTAT = [SP++]; \
+	P0 = [SP++]; \
+	P1 = [SP++]; \
+	R0 = [SP++]
+
+/*
+* Set up the IVG routing.
+*/
+
+.align 2
+.global _QXK_init;
+.type _QXK_init, STT_FUNC;
+
+_QXK_init:
+    LINK 0;
+	[--SP] = P0;
+	[--SP] = R1;
+
+	//Set handler for IVG13
+	P0.H = HI(REG_ICU_EVT13);
+	P0.L = LO(REG_ICU_EVT13);
+	R1.L = _NMI_Handler
+	R1.H = _NMI_Handler
+	[P0] = R1;
+
+	//Set handler for IVG14
+	P0.H = HI(REG_ICU_EVT14);
+	P0.L = LO(REG_ICU_EVT14);
+	R1.L = _PendSV_Handler
+	R1.H = _PendSV_Handler
+	[P0] = R1;
+
+	R1 = [SP++];
+	P0 = [SP++];
+	UNLINK;
+	RTS;
+
+/*****************************************************************************
+* Thread_ret is a helper function executed when the QXK activator returns.
+*
+* NOTE: Thread_ret does not execute in the PendSV context!
+* NOTE: Thread_ret executes entirely with interrupts DISABLED.
+*****************************************************************************/
+
+.align 2
+.global _Thread_ret;
+.type _Thread_ret, STT_FUNC;
+_Thread_ret:
+	    /* After the QXK activator returns, we need to resume the preempted
+	    * thread. However, this must be accomplished by a return-from-exception,
+	    * while we are still in the thread context. The switch to the exception
+	    * contex is accomplished by triggering the NMI exception.
+	    * NOTE: The NMI exception is triggered with nterrupts DISABLED,
+	    * because QXK activator disables interrutps before return.
+	    */
+
+	    /* trigger NMI to return to preempted task...
+	    * NOTE: The NMI exception is triggered with nterrupts DISABLED
+	    */
+	RAISE 13;					 //TODO: we will need to mask off everything but IVG13
+	P5.H = ___imask;
+	P5.L = ___imask;
+	R7 = [P5];
+	STI R7;
+	CSYNC;
+	IDLE;
+
+/*****************************************************************************
+* The NMI_Handler exception handler is used for returning back to the
+* interrupted task. The NMI exception simply removes its own interrupt
+* stack frame from the stack and returns to the preempted task using the
+* interrupt stack frame that must be at the top of the stack.
+*
+* NOTE: The NMI exception is entered with interrupts DISABLED, so it needs
+* to re-enable interrupts before it returns to the preempted task.
+*****************************************************************************/
+
+.align 2
+.global _NMI_Handler;
+.type _NMI_Handler, STT_FUNC;
+_NMI_Handler:
+	//TODO: unmask interrupts other than IVG13
+	RESTORE_CONTEXT;
+	RTI;
+
 /*****************************************************************************
 * The PendSV_Handler exception handler is used for handling context switch
 * and asynchronous preemption in QXK. The use of the PendSV exception is
@@ -55,31 +223,37 @@
 .extern _QXK_attr_;
 .type _QXK_attr_,STT_OBJECT;
 
+.extern ___imask;
+.type ___imask,STT_OBJECT;
+
 _PendSV_Handler:
-	[--SP] = R7;
-	[--SP] = R6;
-	[--SP] = P2;
-	[--SP] = P5;
-	[--SP] = P4;
-	[--SP] = P3;
+	[--SP] = R0;
+	[--SP] = P1;
+	[--SP] = P0;
 	[--SP] = ASTAT;
 
-	P5.H = _QXK_attr_;
-	P5.L = _QXK_attr_;
+    /* disable interrupts */
+    P1.H = ___imask;
+    P1.L = ___imask;
+    CLI R0;
+    [P1] = R0;
 
-	//TODO: disable interrupts here if we enable nesting
+	P1.H = _QXK_attr_;
+	P1.L = _QXK_attr_;
 
-	P4 = [P5+QXK_NEXT]; 			/*P4 = QXK_attr_.next */
+	P0 = [P1+QXK_NEXT]; 			/*P0 = QXK_attr_.next */
 
 	/* Check QXK_attr_.next, which contains the pointer to the next thread
     * to run, which is set in QXK_ISR_EXIT(). This pointer must not be NULL.
     */
-	CC = P4 == 0;					/* is (QXK_attr_.next == 0)? */
+	CC = P0 == 0;					/* is (QXK_attr_.next == 0)? */
     IF CC JUMP PendSV_return;		/* branch if (QXK_attr_.next == 0) */
 
+    SAVE_CONTEXT;
+
     /* Load pointers into registers... */
-    R7 = [P4+QMACTIVE_OSOBJ];		/* r7 := QXK_attr_.next->osObject */
-    P2 = [P5+QXK_CURR]				/* P2 := QXK_attr_.curr */
+    R7 = [P0+QMACTIVE_OSOBJ];		/* r7 := QXK_attr_.next->osObject */
+    P2 = [P1+QXK_CURR]				/* P2 := QXK_attr_.curr */
 
     CC = P2 == 0;					/* (QXK_attr_.curr == 0)? */
 	IF !CC JUMP PendSV_save_ex;      /* branch if (current thread is extended) */
@@ -88,8 +262,6 @@ _PendSV_Handler:
     IF !CC JUMP PendSV_save_ao    	/* branch if (next tread is extended) */
 
 PendSV_activate:
-	//TODO: leaving off here
-
 	/* The QXK activator must be called in a thread context, while this code
     * executes in the handler contex of the PendSV exception. The switch
     * to the Thread mode is accomplished by returning from PendSV using
@@ -99,19 +271,15 @@ PendSV_activate:
     * NOTE: the QXK activator is called with interrupts DISABLED and also
     * it returns with interrupts DISABLED.
     */
-      MOV     r3,#1
-      LSL     r3,r3,#24         /* r3 := (1 << 24), set the T bit  (new xpsr) */
-      LDR     r2,=QXK_activate_ /* address of QXK_activate_ */
-      SUB     r2,r2,#1          /* align Thumb-address at halfword (new pc) */
-      LDR     r1,=Thread_ret    /* return address after the call   (new lr) */
+    R0.H = _QXK_activate_;
+    R0.L = _QXK_activate_;
+    RETI = R0;					/* return to QXK_activate_ from this interrupt */
 
-      SUB     sp,sp,#(8*4)      /* reserve space for exception stack frame */
-      ADD     r0,sp,#(5*4)      /* r0 := 5 registers below the top of stack */
-      STM     r0!,{r1-r3}       /* save xpsr,pc,lr */
+    R0.H = _Thread_ret;
+    R0.L = _Thread_ret;
+    RETS = R0;					 /* return address after the call   (new reti) */
 
-      MOV     r0,#6
-      MVN     r0,r0             /* r0 := ~6 == 0xFFFFFFF9 */
-      BX      r0                /* exception-return to the QXK activator */
+    RTI;						/* return */
 
 	 /*=========================================================================
     * Saving AO-thread before crossing to eXtended-thread
@@ -137,11 +305,9 @@ PendSV_restore_ao:
 
 PendSV_return:
 	ASTAT = [SP++];
-	P3 = [SP++];
-	P4 = [SP++];
-	P5 = [SP++];
-	P2 = [SP++];
-	R7 = [SP++];
+	P0 = [SP++];
+	P1 = [SP++];
+	R0 = [SP++];
 
 PendSV_save_ex:
 

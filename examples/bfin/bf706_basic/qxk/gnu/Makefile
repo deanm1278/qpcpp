@@ -145,7 +145,7 @@ BFIN_CPU   := -mcpu=bf706
 # GNU-BFIN toolset (NOTE: You need to adjust to your machine)
 #
 ifeq ($(GNU_BFIN),)
-GNU_BFIN := C:/cygwin64/bfin-gnu-new/buildscript/bfin-elf-win
+GNU_BFIN := /home/dean/dsp/blackfin-plus-gnu/buildscript/bfin-elf
 endif
 
 # make sure that the GNU-BFIN toolset exists...

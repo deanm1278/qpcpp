@@ -47,31 +47,6 @@ void PendSV_Handler(void);
 void NMI_Handler(void);
 void Thread_ret(void);
 
-/*
-* Initialize the exception priorities and IRQ priorities to safe values.
-*
-* Description:
-* On Cortex-M3/M4/M7, this QXK port disables interrupts by means of the
-* BASEPRI register. However, this method cannot disable interrupt
-* priority zero, which is the default for all interrupts out of reset.
-* The following code changes the SysTick priority and all IRQ priorities
-* to the safe value QF_BASEPRI, wich the QF critical section can disable.
-* This avoids breaching of the QF critical sections in case the
-* application programmer forgets to explicitly set priorities of all
-* "kernel aware" interrupts.
-*
-* The interrupt priorities established in QXK_init() can be later
-* changed by the application-level code.
-*/
-void QXK_init(void) {
-    //set REG_ICU_EVT14 to call PendSV_Handler
-    __asm volatile( 
-    "  P0 = 0x1FC02038 ;        \n" // P0 = ICU_EVT14
-    "  R0.H = _PendSV_Handler ; \n"
-    "  R0.L = _PendSV_Handler ; \n"
-    "  [P0] = R0 ;              \n"
-    ::: "P0", "R0" );
-}
 
 /*****************************************************************************
 * Initialize the private stack of an extended QXK thread.
@@ -125,59 +100,6 @@ void QXK_stackInit_(void *act, QP::QActionHandler thread,
 }
 
 volatile unsigned int __imask;
-
-/*****************************************************************************
-* Thread_ret is a helper function executed when the QXK activator returns.
-*
-* NOTE: Thread_ret does not execute in the PendSV context!
-* NOTE: Thread_ret executes entirely with interrupts DISABLED.
-*****************************************************************************/
-//__attribute__ ((naked, optimize("-fno-stack-protector")))
-void Thread_ret(void) {
-__asm volatile (
-    ""
-#if 0
-    /* After the QXK activator returns, we need to resume the preempted
-    * thread. However, this must be accomplished by a return-from-exception,
-    * while we are still in the thread context. The switch to the exception
-    * contex is accomplished by triggering the NMI exception.
-    * NOTE: The NMI exception is triggered with nterrupts DISABLED,
-    * because QXK activator disables interrutps before return.
-    */
-
-    /* trigger NMI to return to preempted task...
-    * NOTE: The NMI exception is triggered with nterrupts DISABLED
-    */
-    "  LDR     r0,=0xE000ED04   \n" /* Interrupt Control and State Register */
-    "  MOV     r1,#1            \n"
-    "  LSL     r1,r1,#31        \n" /* r1 := (1 << 31) (NMI bit) */
-    "  STR     r1,[r0]          \n" /* ICSR[31] := 1 (pend NMI) */
-    "  B       .                \n" /* wait for preemption by NMI */
-#endif
-    );
-}
-
-/*****************************************************************************
-* The NMI_Handler exception handler is used for returning back to the
-* interrupted task. The NMI exception simply removes its own interrupt
-* stack frame from the stack and returns to the preempted task using the
-* interrupt stack frame that must be at the top of the stack.
-*
-* NOTE: The NMI exception is entered with interrupts DISABLED, so it needs
-* to re-enable interrupts before it returns to the preempted task.
-*****************************************************************************/
-//__attribute__ ((naked, optimize("-fno-stack-protector")))
-void NMI_Handler(void) {
-__asm volatile (
-    ""
-#if 0
-    "  ADD     sp,sp,#(8*4)     \n" /* remove one 8-register exception frame */
-
-    "  CPSIE   i                \n" /* enable interrupts (clear PRIMASK) */
-    "  BX      lr               \n" /* return to the preempted task */
-#endif
-    );
-}
 
 /*****************************************************************************
 * hand-optimized quick LOG2 in assembly (bfin has no CLZ instruction)
