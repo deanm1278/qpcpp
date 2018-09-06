@@ -1,3 +1,6 @@
+## THIS FORK ADDS A PORT TO BLACKFIN+ GNU TOOLCHAIN
+see `examples/bfin`
+
 ![QP framework](https://state-machine.com/img/qp_banner.jpg)
 
 > **NOTE:** If your company has a policy forbidding open source in your
