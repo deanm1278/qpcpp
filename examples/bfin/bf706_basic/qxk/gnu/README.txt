@@ -4,6 +4,8 @@ This example can be built from the command prompt with the provided
 Makefile. The example can also be imported as a Makefile-based
 project into Eclipse-based IDEs.
 
+This example uses the kernel timer to blink the LED on a BF706 EZ-Kit MINI board.
+
 
 The Makefile
 ============
@@ -17,23 +19,14 @@ Makefile with the Eclipse CDT.
 The various build configurations are built as follows:
 
 make
-make CONF=rel
-make CONF=spy
-
 make clean
-make CONF=rel clean
-make CONF=spy clean
 
 ***
 NOTE:
-The installation folder of the GNU-ARM toolset on YOUR machine needs
-to be adjusted in the provided Makefile, by editing the symbol: GNU_ARM.
-As described in the comment for this symbol, the GNU-ARM toolset is taken
-from: http://gnutoolchains.com/arm-eabi
-
-It is highly recommened to use the same GNU-ARM distribution, especially
-for ARM Cortex-M4F projects, due to the support for the hardware FPU
-(float-abi=hard).
+The installation folder of the GNU-BFIN toolset on YOUR machine needs
+to be adjusted in the provided Makefile, by editing the symbol: GNU_BFIN.
+As described in the comment for this symbol, the GNU-BFIN toolset is taken
+from: https://github.com/deanm1278/blackfin-plus-gnu/releases
 ***
 
 
@@ -46,22 +39,7 @@ script for QP applications.
 
 Startup Code
 ============
-The startup code for the EFM32PG1B200F256GM48 MCU used in this project
-is located in the "3rd_party" folder in the following location:
-
-qpc\3rd_party\efm32pg1b\gnu\startup_efm32pg1b.c
-
-The file startup_efm32pg1b.c provides a template of the recommended
-startup for QP applications and should be easily customizable for other
-ARM Cortex-M microcontrollers.
-
-The startup file typically does not need to be modified or adapted for
-applications. It provides only weak definitions of all exception and
-interrupt handlers, as well as the assert_failed() function.  
-
-The weak function assert_failed() defined in this file might be re-defined
-in the application to customize it for the application-specific error-
-handling policy.
+TODO:
 
 ***
 NOTE: The function assert_failed() typically should NOT use the stack,

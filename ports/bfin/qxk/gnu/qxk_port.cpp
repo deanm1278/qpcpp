@@ -1,6 +1,6 @@
 /**
 * @file
-* @brief QXK/C++ port to blackfin, GNU-ARM toolset
+* @brief QXK/C++ port to blackfin, GNU-BFIN toolset
 * @cond
 ******************************************************************************
 * Last Updated for Version: 6.3.2
@@ -64,6 +64,8 @@ void QXK_stackInit_(void *act, QP::QActionHandler thread,
 {
     extern void QXK_threadRet_(void); /* extended thread return */
 
+    //TODO:
+#if 0
     /* round down the stack top to the 8-byte boundary
     * NOTE: ARM Cortex-M stack grows down from hi -> low memory
     */
@@ -97,43 +99,27 @@ void QXK_stackInit_(void *act, QP::QActionHandler thread,
     for (; sp >= sp_limit; --sp) {
         *sp = 0xDEADBEEFU;
     }
+#endif
 }
 
 volatile unsigned int __imask;
 
 /*****************************************************************************
-* hand-optimized quick LOG2 in assembly (bfin has no CLZ instruction)
+* hand-optimized quick LOG2 in assembly (bfin has no real CLZ instruction)
 *****************************************************************************/
 
 //__attribute__ ((naked, optimize("-fno-stack-protector")))
 uint_fast8_t QF_qlog2(uint32_t x) {
+	int c = 31;
 __asm volatile (
-    ""
-#if 0
-    "  MOV     r1,#0            \n"
-    "  LSR     r2,r0,#16        \n"
-    "  BEQ     QF_qlog2_1       \n"
-    "  MOV     r1,#16           \n"
-    "  MOV     r0,r2            \n"
-    "QF_qlog2_1:                \n"
-    "  LSR     r2,r0,#8         \n"
-    "  BEQ     QF_qlog2_2       \n"
-    "  ADD     r1, r1,#8        \n"
-    "  MOV     r0, r2           \n"
-    "QF_qlog2_2:                \n"
-    "  LSR     r2,r0,#4         \n"
-    "  BEQ     QF_qlog2_3       \n"
-    "  ADD     r1,r1,#4         \n"
-    "  MOV     r0,r2            \n"
-    "QF_qlog2_3:                \n"
-    "  LDR     r2,=QF_qlog2_LUT \n"
-    "  LDRB    r0,[r2,r0]       \n"
-    "  ADD     r0,r1, r0        \n"
-    "  BX      lr               \n"
-    "QF_qlog2_LUT:              \n"
-    "  .byte 0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4"
-#endif
-    );
+	"CC = BITTST(R0, 31);	\n"
+	"IF !CC JUMP log2_clz;	\n"
+	"R0 >>= 1;				\n"
+"log2_clz:					\n"
+    "R0.L = SIGNBITS %0;	\n"
+	"R0 = R0.L (Z);			\n"
+	"R0 = %1 - R0;			\n"
+    :: "d"(x), "d"(c));
 }
 
 } // extern "C"
